@@ -1,0 +1,73 @@
+services:
+  nginx:
+    build:
+      context: ./nginx/
+    image: custom_nginx:latest
+    container_name: indie_nginx
+    ports:
+      - 80:80
+    restart: unless-stopped
+    volumes:
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf
+      - static_files:/app/staticfiles
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - indie-net
+
+  backend:
+    image: indie_backend:latest
+    container_name: indie_backend
+    build:
+      context: ./backend/
+    command: sh -c "echo 'Preparing application...' && sleep 10s && python manage.py makemigrations && python manage.py migrate && gunicorn core.wsgi:application --bind 0.0.0.0:8000"
+    ports:
+      - 8000:8000
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - db
+    restart: unless-stopped
+    volumes:
+      - static_files:/app/staticfiles
+    networks:
+      - indie-net
+
+  frontend:
+    image: indie_frontend:latest
+    container_name: indie_frontend
+    build:
+      context: ./frontend/
+    ports:
+      - 5173:5173
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - indie-net
+
+  db:
+    image: mysql:8.0.36
+    container_name: indie_mysql
+    env_file:
+      - ./backend/.env
+    restart: unless-stopped
+    volumes:
+      - indie_mysql_data:/var/lib/mysql
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "3307:3306"
+    networks:
+      - indie-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+
+networks:
+  indie-net:
+
+volumes:
+  indie_mysql_data:
+  static_files:

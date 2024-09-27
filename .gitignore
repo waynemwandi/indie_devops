@@ -1,0 +1,3 @@
+# Ignore frontend and backend codebases
+/frontend/
+/backend/
